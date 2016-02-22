@@ -178,7 +178,9 @@ int bcm_hsotgctrl_phy_mdio_read(int mdio_num)
 		return -EIO;
 
 	/* Enable mdio clk */
-	clk_enable(bcm_hsotgctrl_handle->mdio_master_clk);
+	val = clk_enable(bcm_hsotgctrl_handle->mdio_master_clk);
+	if (val)
+		return val;
 
 	/* Program necessary values */
 	val = (CHIPREG_MDIO_CTRL_ADDR_WRDATA_MDIO_SM_SEL_MASK
@@ -226,7 +228,9 @@ int bcm_hsotgctrl_phy_mdio_write(int mdio_num, int value)
 		return -EIO;
 
 	/* Enable mdio clk */
-	clk_enable(bcm_hsotgctrl_handle->mdio_master_clk);
+	val = clk_enable(bcm_hsotgctrl_handle->mdio_master_clk);
+	if (val)
+		return val;
 
 	/* Program necessary values */
 	val = (CHIPREG_MDIO_CTRL_ADDR_WRDATA_MDIO_SM_SEL_MASK
@@ -265,7 +269,7 @@ int bcm_hsotgctrl_phy_mdio_write(int mdio_num, int value)
 	/* Disable mdio clk */
 	clk_disable(bcm_hsotgctrl_handle->mdio_master_clk);
 
-	return val;
+	return 0;
 }
 
 
