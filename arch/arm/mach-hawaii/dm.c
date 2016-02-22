@@ -974,6 +974,7 @@ static int __init dormant_init(void)
 	struct clk *clk;
 	int i;
 	struct reg_list *reg;
+	int ret;
 
 	clk = clk_get(NULL, KPROC_CCU_CLK_NAME_STR);
 	if (IS_ERR_OR_NULL(clk))
@@ -1029,7 +1030,8 @@ static int __init dormant_init(void)
 		pr_info("%s: addnl regs alloc failed\n", __func__);
 		dma_free_coherent(NULL, SZ_4K, proc, proc_regs_p);
 		dma_free_coherent(NULL, SZ_4K, vptr, drmt_buf_phy);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto free_proc;
 	}
 	pr_info("%s: addnl registers buffer; addnl = 0x%x",
 		__func__, (unsigned int)addnl);
@@ -1050,6 +1052,14 @@ static int __init dormant_init(void)
 	} while (boot_2nd_addr & 1);
 #endif
 	return 0;
+
+free_proc:
+	dma_free_coherent(NULL, SZ_4K, proc, proc_regs_p);
+
+free_vptr:
+	dma_free_coherent(NULL, SZ_4K, vptr, drmt_buf_phy);
+
+	return ret;
 }
 
 module_init(dormant_init);
