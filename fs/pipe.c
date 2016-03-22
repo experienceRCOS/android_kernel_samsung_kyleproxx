@@ -104,25 +104,25 @@ void pipe_wait(struct pipe_inode_info *pipe)
 }
 
 static int
-pipe_iov_copy_from_user(void *to, struct iovec *iov, unsigned long len,
-			int atomic)
+pipe_iov_copy_from_user(void *addr, int *offset, struct iovec *iov,
+			size_t *remaining, int atomic)
 {
 	unsigned long copy;
 
-	while (len > 0) {
+	while (*remaining > 0) {
 		while (!iov->iov_len)
 			iov++;
-		copy = min_t(unsigned long, len, iov->iov_len);
+		copy = min_t(unsigned long, *remaining, iov->iov_len);
 
 		if (atomic) {
-			if (__copy_from_user_inatomic(to, iov->iov_base, copy))
+			if (__copy_from_user_inatomic(addr + *offset, iov->iov_base, copy))
 				return -EFAULT;
 		} else {
-			if (copy_from_user(to, iov->iov_base, copy))
+			if (copy_from_user(addr + *offset, iov->iov_base, copy))
 				return -EFAULT;
 		}
-		to += copy;
-		len -= copy;
+		*offset += copy;
+		*remaining -= copy;
 		iov->iov_base += copy;
 		iov->iov_len -= copy;
 	}
@@ -130,25 +130,25 @@ pipe_iov_copy_from_user(void *to, struct iovec *iov, unsigned long len,
 }
 
 static int
-pipe_iov_copy_to_user(struct iovec *iov, const void *from, unsigned long len,
-		      int atomic)
+pipe_iov_copy_to_user(struct iovec *iov, void *addr, int *offset,
+		      size_t *remaining, int atomic)
 {
 	unsigned long copy;
 
-	while (len > 0) {
+	while (*remaining > 0) {
 		while (!iov->iov_len)
 			iov++;
-		copy = min_t(unsigned long, len, iov->iov_len);
+		copy = min_t(unsigned long, *remaining, iov->iov_len);
 
 		if (atomic) {
-			if (__copy_to_user_inatomic(iov->iov_base, from, copy))
+			if (__copy_to_user_inatomic(iov->iov_base, addr + *offset, copy))
 				return -EFAULT;
 		} else {
-			if (copy_to_user(iov->iov_base, from, copy))
+			if (copy_to_user(iov->iov_base, addr + *offset, copy))
 				return -EFAULT;
 		}
-		from += copy;
-		len -= copy;
+		*offset += copy;
+		*remaining -= copy;
 		iov->iov_base += copy;
 		iov->iov_len -= copy;
 	}
