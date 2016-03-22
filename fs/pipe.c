@@ -384,7 +384,7 @@ pipe_read(struct kiocb *iocb, const struct iovec *_iov,
 			struct pipe_buffer *buf = pipe->bufs + curbuf;
 			const struct pipe_buf_operations *ops = buf->ops;
 			void *addr;
-			size_t chars = buf->len;
+			size_t chars = buf->len, remaining;
 			int error, atomic;
 
 			if (chars > total_len)
@@ -398,9 +398,10 @@ pipe_read(struct kiocb *iocb, const struct iovec *_iov,
 			}
 
 			atomic = !iov_fault_in_pages_write(iov, chars);
+			remaining = chars;
 redo:
 			addr = ops->map(pipe, buf, atomic);
-			error = pipe_iov_copy_to_user(iov, addr + buf->offset, chars, atomic);
+			error = pipe_iov_copy_to_user(iov, addr + &buf->offset, &remaining, atomic);
 			ops->unmap(pipe, buf, addr);
 			if (unlikely(error)) {
 				/*
@@ -415,7 +416,6 @@ redo:
 				break;
 			}
 			ret += chars;
-			buf->offset += chars;
 			buf->len -= chars;
 
 			/* Was it a packet buffer? Clean up and exit */
@@ -522,6 +522,7 @@ pipe_write(struct kiocb *iocb, const struct iovec *_iov,
 		if (ops->can_merge && offset + chars <= PAGE_SIZE) {
 			int error, atomic = 1;
 			void *addr;
+			size_t remaining = chars;
 
 			error = ops->confirm(pipe, buf);
 			if (error)
@@ -530,8 +531,8 @@ pipe_write(struct kiocb *iocb, const struct iovec *_iov,
 			iov_fault_in_pages_read(iov, chars);
 redo1:
 			addr = ops->map(pipe, buf, atomic);
-			error = pipe_iov_copy_from_user(offset + addr, iov,
-							chars, atomic);
+			error = pipe_iov_copy_from_user(addr, &offset, iov,
+							&remaining, atomic);
 			ops->unmap(pipe, buf, addr);
 			ret = error;
 			do_wakeup = 1;
@@ -566,6 +567,8 @@ redo1:
 			struct page *page = pipe->tmp_page;
 			char *src;
 			int error, atomic = 1;
+			int offset = 0;
+			size_t remaining;
 
 			if (!page) {
 				page = alloc_page(GFP_HIGHUSER);
@@ -586,14 +589,15 @@ redo1:
 				chars = total_len;
 
 			iov_fault_in_pages_read(iov, chars);
+			remaining = chars;
 redo2:
 			if (atomic)
 				src = kmap_atomic(page);
 			else
 				src = kmap(page);
 
-			error = pipe_iov_copy_from_user(src, iov, chars,
-							atomic);
+			error = pipe_iov_copy_from_user(src, &offset, iov,
+							&remaining, atomic);
 			if (atomic)
 				kunmap_atomic(src);
 			else
